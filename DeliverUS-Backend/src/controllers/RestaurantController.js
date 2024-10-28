@@ -1,4 +1,4 @@
-import { Restaurant, Product, RestaurantCategory, ProductCategory } from '../models/models.js'
+import { Restaurant, Product, RestaurantCategory, ProductCategory, sequelizeSession } from '../models/models.js'
 
 const index = async function (req, res) {
   try {
@@ -10,7 +10,7 @@ const index = async function (req, res) {
         model: RestaurantCategory,
         as: 'restaurantCategory'
       },
-        order: [[{ model: RestaurantCategory, as: 'restaurantCategory' }, 'name', 'ASC']]
+        order: ['promoted', [{ model: RestaurantCategory, as: 'restaurantCategory' }, 'name', 'ASC']]
       }
     )
     res.json(restaurants)
@@ -61,7 +61,7 @@ const show = async function (req, res) {
         model: RestaurantCategory,
         as: 'restaurantCategory'
       }],
-      order: [[{ model: Product, as: 'products' }, 'order', 'ASC']]
+      order: ['promoted', [{ model: Product, as: 'products' }, 'order', 'ASC']]
     }
     )
     res.json(restaurant)
@@ -95,12 +95,32 @@ const destroy = async function (req, res) {
   }
 }
 
+const promote = async function (req, res) {
+  const t = await sequelizeSession.transaction()
+  try {
+    const existingPromotedRestaurant = await Restaurant.findOne({ where: { userId: req.user.id, promoted: true } }) // Busca si el usuario ya tiene un restaurante promocionado
+    const restaurant = await Restaurant.findByPk(req.params.restaurantId) // Busca el restaurante
+    if (existingPromotedRestaurant) { // Si el usuario ya tiene un restaurante promocionado, se despromociona
+      existingPromotedRestaurant.promoted = false
+    }
+    restaurant.promoted = true
+    await restaurant.save({ transaction: t }) // Guarda el restaurante recién promocionado
+    await t.commit()
+    res.json(restaurant)
+  } catch (err) {
+    await t.rollback()
+    res.status(500).send(err)
+  }
+}
+
 const RestaurantController = {
   index,
   indexOwner,
   create,
   show,
   update,
-  destroy
+  destroy,
+  promote
 }
+
 export default RestaurantController

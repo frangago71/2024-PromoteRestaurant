@@ -1,6 +1,34 @@
 import { check } from 'express-validator'
-import { checkFileIsImage, checkFileMaxSize } from './FileValidationHelper.js'
-const maxFileSize = 2000000 // around 2Mb
+import { checkFileIsImage, checkFileMaxSize } from './FileValidationHelper.js' // around 2Mb
+import { Restaurant } from '../../models/models.js'
+const maxFileSize = 2000000
+
+// const checkBussinessRuleOneRestaurantPromotedByOwner = async (ownerId, promotedValue) => {
+//   if (promotedValue) {
+//     try {
+//       const promotedRestaurant = await Restaurant.findAll({ where: { userId: ownerId, promoted: true } })
+//       if (promotedRestaurant.length !== 0) {
+//         return Promise.reject(new Error('You can only promote one restaurant at a time'))
+//       }
+//     } catch (error) {
+//       return Promise.reject(new Error(error))
+//     }
+//   }
+//   return Promise.resolve('ok')
+// }
+
+const noOtherPromotion = async (value, { req }) => {
+  try {
+    const posibleR = await Restaurant.findOne({ where: { userId: req.user.id, isPromoted: true } })
+    if (!posibleR) {
+      return Promise.resolve()
+    } else {
+      return Promise.reject(new Error('Owner already has a promoted restaurant'))
+    }
+  } catch (luna) {
+    return Promise.reject(new Error(luna))
+  }
+}
 
 const create = [
   check('name').exists().isString().isLength({ min: 1, max: 255 }).trim(),
@@ -24,7 +52,13 @@ const create = [
   }).withMessage('Please upload an image with format (jpeg, png).'),
   check('logo').custom((value, { req }) => {
     return checkFileMaxSize(req, 'logo', maxFileSize)
-  }).withMessage('Maximum file size of ' + maxFileSize / 1000000 + 'MB')
+  }).withMessage('Maximum file size of ' + maxFileSize / 1000000 + 'MB'),
+  check('promoted').custom(noOtherPromotion)
+  // check('promoted')
+  //   .custom(async (value, { req }) => {
+  //     return checkBussinessRuleOneRestaurantPromotedByOwner(req.user.id, value)
+  //   })
+  //   .withMessage('You can only promote one restaurant at a time')
 ]
 const update = [
   check('name').exists().isString().isLength({ min: 1, max: 255 }).trim(),
@@ -48,7 +82,12 @@ const update = [
   }).withMessage('Please upload an image with format (jpeg, png).'),
   check('logo').custom((value, { req }) => {
     return checkFileMaxSize(req, 'logo', maxFileSize)
-  }).withMessage('Maximum file size of ' + maxFileSize / 1000000 + 'MB')
+  }).withMessage('Maximum file size of ' + maxFileSize / 1000000 + 'MB'),
+  //   check('promoted')
+  //     .custom(async (value, { req }) => {
+  //       return checkBussinessRuleOneRestaurantPromotedByOwner(req.user.id, value)
+  //     })
+  //     .withMessage('You can only promote one restaurant at a time')
+  check('promoted').custom(noOtherPromotion)
 ]
-
 export { create, update }
